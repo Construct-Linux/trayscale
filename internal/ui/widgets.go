@@ -2,7 +2,9 @@ package ui
 
 import (
 	"context"
+	"log/slog"
 	"net/netip"
+	"time"
 
 	"codeberg.org/puregotk/puregotk/v4/adw"
 	"codeberg.org/puregotk/puregotk/v4/gio"
@@ -11,8 +13,66 @@ import (
 	"codeberg.org/puregotk/puregotk/v4/gtk"
 	"deedles.dev/trayscale/internal/gutil"
 	"deedles.dev/trayscale/internal/locale"
+	"deedles.dev/trayscale/internal/tsutil"
 	"tailscale.com/tailcfg"
 )
+
+// tsTimeout bounds a request to tailscaled made from the UI.
+const tsTimeout = 30 * time.Second
+
+// goTS runs call off the main thread with tsTimeout, as setStatus does,
+// so that a slow or stuck tailscaled can't freeze the window, and then
+// done, if it isn't nil, on the main thread with call's error. keep
+// stays alive until done has run, in case its window is closed in the
+// meantime.
+func goTS(keep *gobject.Object, what string, call func(context.Context) error, done func(error)) {
+	if keep != nil {
+		keep.Ref()
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), tsTimeout)
+		defer cancel()
+
+		err := call(ctx)
+		if err != nil {
+			slog.Error(what, "err", err)
+		}
+		gutil.IdleAdd(func() {
+			if done != nil {
+				done(err)
+			}
+			if keep != nil {
+				keep.Unref()
+			}
+		})
+	}()
+}
+
+// applySwitch applies s with set through goTS. The status updates that
+// follow set the switch; if set fails, it's turned back.
+func applySwitch(sw *gtk.Switch, what string, s bool, set func(context.Context, bool) error) {
+	goTS(&sw.Object, what, func(ctx context.Context) error {
+		return set(ctx, s)
+	}, func(err error) {
+		if err != nil {
+			sw.SetActive(!s)
+		}
+	})
+}
+
+// setExitNode uses the peer with id as the exit node if s is true, or
+// stops using one if it's false. A machine can't use an exit node while
+// it advertises itself as one, so that's turned off first.
+func setExitNode(ctx context.Context, id tailcfg.StableNodeID, s bool) error {
+	if !s {
+		return tsutil.DisableExitNode(ctx)
+	}
+	if err := tsutil.AdvertiseExitNode(ctx, false); err != nil {
+		slog.Error("disable exit node advertisement", "err", err)
+		// Continue anyways.
+	}
+	return tsutil.ExitNode(ctx, id)
+}
 
 // addPageAction adds action to group, connecting activate, and drops
 // the caller's reference to action.

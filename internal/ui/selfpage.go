@@ -21,6 +21,7 @@ import (
 	"deedles.dev/xiter"
 	"github.com/inhies/go-bytesize"
 	"tailscale.com/client/tailscale/apitype"
+	"tailscale.com/net/netcheck"
 	"tailscale.com/tailcfg"
 )
 
@@ -124,25 +125,19 @@ func (page *SelfPage) init(a *App, status *tsutil.IPNStatus) {
 		page.showExitNode()
 	})
 
-	page.connectSwitch(page.AdvertiseExitNodeRow, "advertise exit node", func(s bool) error {
+	page.connectSwitch(page.AdvertiseExitNodeRow, "advertise exit node", func(ctx context.Context, s bool) error {
 		if s {
-			err := tsutil.DisableExitNode(context.TODO())
+			err := tsutil.DisableExitNode(ctx)
 			if err != nil {
 				slog.Error("disable existing exit node", "err", err)
 				// Continue anyways.
 			}
 		}
-		return tsutil.AdvertiseExitNode(context.TODO(), s)
+		return tsutil.AdvertiseExitNode(ctx, s)
 	})
-	page.connectSwitch(page.AllowLANAccessRow, "allow LAN access", func(s bool) error {
-		return tsutil.AllowLANAccess(context.TODO(), s)
-	})
-	page.connectSwitch(page.AcceptRoutesRow, "accept routes", func(s bool) error {
-		return tsutil.AcceptRoutes(context.TODO(), s)
-	})
-	page.connectSwitch(page.AcceptDNSRow, "accept DNS", func(s bool) error {
-		return tsutil.AcceptDNS(context.TODO(), s)
-	})
+	page.connectSwitch(page.AllowLANAccessRow, "allow LAN access", tsutil.AllowLANAccess)
+	page.connectSwitch(page.AcceptRoutesRow, "accept routes", tsutil.AcceptRoutes)
+	page.connectSwitch(page.AcceptDNSRow, "accept DNS", tsutil.AcceptDNS)
 
 	gutil.Connect(page.AdvertiseRouteButton, page.AdvertiseRouteButton.ConnectClicked, func(gtk.Button) {
 		Prompt{
@@ -163,84 +158,87 @@ func (page *SelfPage) init(a *App, status *tsutil.IPNStatus) {
 				return
 			}
 
-			prefs, err := tsutil.Prefs(context.TODO())
-			if err != nil {
-				slog.Error("get prefs", "err", err)
-				return
-			}
-
-			err = tsutil.AdvertiseRoutes(
-				context.TODO(),
-				append(prefs.AdvertiseRoutes, p),
-			)
-			if err != nil {
-				slog.Error("advertise routes", "err", err)
-				return
-			}
+			goTS(nil, "advertise routes", func(ctx context.Context) error {
+				prefs, err := tsutil.Prefs(ctx)
+				if err != nil {
+					return err
+				}
+				return tsutil.AdvertiseRoutes(ctx, append(prefs.AdvertiseRoutes, p))
+			}, nil)
 		})
 	})
 
-	type latencyEntry = xiter.Pair[string, time.Duration]
 	gutil.Connect(page.NetCheckButton, page.NetCheckButton.ConnectClicked, func(gtk.Button) {
-		r, dm, err := tsutil.NetCheck(context.TODO(), true)
-		if err != nil {
-			slog.Error("netcheck", "err", err)
-			return
-		}
+		// A net check measures the network for seconds: it runs off the
+		// main thread, the button off until it's done.
+		page.NetCheckButton.SetSensitive(false)
+		var (
+			r  *netcheck.Report
+			dm *tailcfg.DERPMap
+		)
+		goTS(&page.Page.Object, "netcheck", func(ctx context.Context) (err error) {
+			r, dm, err = tsutil.NetCheck(ctx, true)
+			return err
+		}, func(err error) {
+			page.NetCheckButton.SetSensitive(true)
+			if err == nil {
+				page.showNetCheck(r, dm)
+			}
+		})
+	})
+}
 
-		page.LastNetCheck.SetText(formatTime(time.Now()))
-		page.UDPRow.SetVisible(true)
-		page.UDP.SetFromGicon(boolIcon(r.UDP))
-		page.IPv4Row.SetVisible(true)
-		page.IPv4Icon.SetVisible(!r.IPv4)
-		page.IPv4Icon.SetFromGicon(boolIcon(r.IPv4))
-		page.IPv4Addr.SetVisible(r.IPv4)
-		page.IPv4Addr.SetText(r.GlobalV4.String())
-		page.IPv6Row.SetVisible(true)
-		page.IPv6Icon.SetVisible(!r.IPv6)
-		page.IPv6Icon.SetFromGicon(boolIcon(r.IPv6))
-		page.IPv6Addr.SetVisible(r.IPv6)
-		page.IPv6Addr.SetText(r.GlobalV6.String())
-		page.UPnPRow.SetVisible(true)
-		page.UPnP.SetFromGicon(optBoolIcon(r.UPnP))
-		page.PMPRow.SetVisible(true)
-		page.PMP.SetFromGicon(optBoolIcon(r.PMP))
-		page.PCPRow.SetVisible(true)
-		page.PCP.SetFromGicon(optBoolIcon(r.PCP))
-		page.CaptivePortalRow.SetVisible(true)
-		page.CaptivePortal.SetFromGicon(optBoolIcon(r.CaptivePortal))
-		page.PreferredDERPRow.SetVisible(true)
-		page.PreferredDERP.SetText(dm.Regions[r.PreferredDERP].RegionName)
+// showNetCheck shows the result of a net check.
+func (page *SelfPage) showNetCheck(r *netcheck.Report, dm *tailcfg.DERPMap) {
+	type latencyEntry = xiter.Pair[string, time.Duration]
 
-		page.DERPLatencies.SetVisible(true)
-		namedLats := func(yield func(latencyEntry) bool) {
-			for id, latency := range r.RegionLatency {
-				named := xiter.P(dm.Regions[id].RegionName, latency)
-				if !yield(named) {
-					return
-				}
+	page.LastNetCheck.SetText(formatTime(time.Now()))
+	page.UDPRow.SetVisible(true)
+	page.UDP.SetFromGicon(boolIcon(r.UDP))
+	page.IPv4Row.SetVisible(true)
+	page.IPv4Icon.SetVisible(!r.IPv4)
+	page.IPv4Icon.SetFromGicon(boolIcon(r.IPv4))
+	page.IPv4Addr.SetVisible(r.IPv4)
+	page.IPv4Addr.SetText(r.GlobalV4.String())
+	page.IPv6Row.SetVisible(true)
+	page.IPv6Icon.SetVisible(!r.IPv6)
+	page.IPv6Icon.SetFromGicon(boolIcon(r.IPv6))
+	page.IPv6Addr.SetVisible(r.IPv6)
+	page.IPv6Addr.SetText(r.GlobalV6.String())
+	page.UPnPRow.SetVisible(true)
+	page.UPnP.SetFromGicon(optBoolIcon(r.UPnP))
+	page.PMPRow.SetVisible(true)
+	page.PMP.SetFromGicon(optBoolIcon(r.PMP))
+	page.PCPRow.SetVisible(true)
+	page.PCP.SetFromGicon(optBoolIcon(r.PCP))
+	page.CaptivePortalRow.SetVisible(true)
+	page.CaptivePortal.SetFromGicon(optBoolIcon(r.CaptivePortal))
+	page.PreferredDERPRow.SetVisible(true)
+	page.PreferredDERP.SetText(dm.Regions[r.PreferredDERP].RegionName)
+
+	page.DERPLatencies.SetVisible(true)
+	namedLats := func(yield func(latencyEntry) bool) {
+		for id, latency := range r.RegionLatency {
+			named := xiter.P(dm.Regions[id].RegionName, latency)
+			if !yield(named) {
+				return
 			}
 		}
-		sortedLats := slices.SortedFunc(namedLats, func(p1, p2 latencyEntry) int { return cmp.Compare(p1.V2, p2.V2) })
-		page.setLatencies(sortedLats)
-	})
+	}
+	sortedLats := slices.SortedFunc(namedLats, func(p1, p2 latencyEntry) int { return cmp.Compare(p1.V2, p2.V2) })
+	page.setLatencies(sortedLats)
 }
 
 // connectSwitch connects a switch row to set, which applies a new
 // state. On error the switch flips back.
-func (page *SelfPage) connectSwitch(row *adw.SwitchRow, what string, set func(bool) error) {
+func (page *SelfPage) connectSwitch(row *adw.SwitchRow, what string, set func(context.Context, bool) error) {
 	sw := rowSwitch(row)
 	gutil.Connect(sw, sw.ConnectStateSet, func(_ gtk.Switch, s bool) bool {
 		if s == sw.GetState() {
 			return false
 		}
 
-		err := set(s)
-		if err != nil {
-			slog.Error(what, "err", err)
-			sw.SetActive(!s)
-			return true
-		}
+		applySwitch(sw, what, s, set)
 		return true
 	})
 }
@@ -255,11 +253,9 @@ func (page *SelfPage) routeRow(route netip.Prefix) *gtk.Widget {
 		routes := slices.Collect(xiter.Filter(page.routeModel.All(), func(p netip.Prefix) bool {
 			return p.Compare(route) != 0
 		}))
-		err := tsutil.AdvertiseRoutes(context.TODO(), routes)
-		if err != nil {
-			slog.Error("advertise routes", "err", err)
-			return
-		}
+		goTS(nil, "advertise routes", func(ctx context.Context) error {
+			return tsutil.AdvertiseRoutes(ctx, routes)
+		}, nil)
 	})
 
 	row := routeActionRow(route)
@@ -309,14 +305,17 @@ func (page *SelfPage) fileRow(file apitype.WaitingFile) *gtk.Widget {
 			Accept:  locale.Get("_Delete"),
 			Reject:  locale.Get("_Cancel"),
 		}.Show(a, func(accept bool) {
-			if accept {
-				err := tsutil.DeleteWaitingFile(context.TODO(), file.Name)
+			if !accept {
+				return
+			}
+			goTS(nil, "delete file", func(ctx context.Context) error {
+				err := tsutil.DeleteWaitingFile(ctx, file.Name)
 				if err != nil {
-					slog.Error("delete file", "err", err)
-					return
+					return err
 				}
 				<-a.poller.Poll()
-			}
+				return nil
+			}, nil)
 		})
 	})
 

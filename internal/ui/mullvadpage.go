@@ -8,7 +8,6 @@ import (
 	_ "embed"
 	"fmt"
 	"iter"
-	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
@@ -389,25 +388,10 @@ func (page *MullvadPage) getExitNodeRow(peer tailcfg.NodeView) *mullvadExitNodeR
 			return false
 		}
 
-		if s {
-			err := tsutil.AdvertiseExitNode(context.TODO(), false)
-			if err != nil {
-				slog.Error("disable exit node advertisement", "err", err)
-				// Continue anyways.
-			}
-		}
-
-		var err error
-		if s {
-			err = tsutil.ExitNode(context.TODO(), peer.StableID())
-		} else {
-			err = tsutil.DisableExitNode(context.TODO())
-		}
-		if err != nil {
-			slog.Error("set exit node", "err", err)
-			sw.SetActive(!s)
-			return true
-		}
+		id := peer.StableID()
+		applySwitch(sw, "set exit node", s, func(ctx context.Context, s bool) error {
+			return setExitNode(ctx, id, s)
+		})
 		return true
 	})
 
