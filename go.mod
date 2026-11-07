@@ -5,13 +5,13 @@ go 1.27.3
 require (
 	codeberg.org/puregotk/purego v0.0.0-20260224095105-2513c838cb80
 	codeberg.org/puregotk/puregotk v0.0.0-20261003054014-d92056b0aa41
-	deedles.dev/tray v0.1.14
+	deedles.dev/tray v0.2.0
 	deedles.dev/xiter v0.2.1
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/klauspost/compress v1.20.3
 	github.com/leonelquinteros/gotext v1.8.0
 	github.com/stretchr/testify v1.12.1
-	tailscale.com v1.104.2
+	tailscale.com v1.104.5
 )
 
 require (
@@ -269,7 +269,7 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20260811152304-ee035b5b010f // indirect
 	golang.org/x/image v0.47.0 // indirect
 	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
