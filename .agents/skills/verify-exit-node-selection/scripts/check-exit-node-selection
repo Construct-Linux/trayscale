@@ -4,8 +4,10 @@
 # guard in the code turns its constant FALSE and the check shows what breaks.
 set -euo pipefail
 
-TLA_VERSION=1.8.0
-TLA_SHA256=d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f
+# The latest stable release: v1.8.0 is a prerelease rebuilt under the same
+# tag, so its jar's sha256 changes without notice.
+TLA_VERSION=1.7.4
+TLA_SHA256=936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
 
 # The tailscale.com version whose daemon behavior the model describes.
 MODELED_TAILSCALE=v1.104.1
@@ -83,9 +85,14 @@ flag SuggestRejectsEmpty "$(all \
   "$(anchor $CLIENT 'func useSuggestedExitNode\('"$FUNC_BODY"'id, err := suggestExitNode\(ctx\)')" \
   "$(anchor $CLIENT 'func keepPreviousExitNode\('"$FUNC_BODY"'id, err = suggestExitNode\(ctx\)')")"
 flag KeepUndoesFailedPin "$(anchor $CLIENT 'func keepPreviousExitNode\('"$FUNC_BODY"'id, err = suggestExitNode\(ctx\)\s*if err != nil \{(?:\s*\/\/[^\n]*)*\s*return errors\.Join\(err, localClient\.SetUseExitNode\(ctx, false\)\)')"
-flag PeerPageOffKeepsPrior "$(anchor internal/ui/peerpage.go 'err = tsutil\.ExitNode\(context\.TODO\(\), page\.peer\.StableID\(\)\)\s*\} else \{\s*err = tsutil\.DisableExitNode\(context\.TODO\(\)\)')"
-flag MullvadPageOffKeepsPrior "$(anchor internal/ui/mullvadpage.go 'err = tsutil\.ExitNode\(context\.TODO\(\), peer\.StableID\(\)\)\s*\} else \{\s*err = tsutil\.DisableExitNode\(context\.TODO\(\)\)')"
-flag AdvertiseKeepsPrior "$(anchor internal/ui/selfpage.go 'connectSwitch\(page\.AdvertiseExitNodeRow, "advertise exit node", func\(s bool\) error \{\s*if s \{\s*err := tsutil\.DisableExitNode\(context\.TODO\(\)\)')"
+# The peer and Mullvad pages' switches both go through setExitNode, which
+# turns exit node use off with DisableExitNode.
+SET_EXIT_NODE_OFF="$(anchor internal/ui/widgets.go 'func setExitNode\('"$FUNC_BODY"'if !s \{\s*return tsutil\.DisableExitNode\(ctx\)')"
+flag PeerPageOffKeepsPrior "$(all "$SET_EXIT_NODE_OFF" \
+  "$(anchor internal/ui/peerpage.go 'id := page\.peer\.StableID\(\)\s*applySwitch\(sw, "set exit node", s, func\(ctx context\.Context, s bool\) error \{\s*return setExitNode\(ctx, id, s\)')")"
+flag MullvadPageOffKeepsPrior "$(all "$SET_EXIT_NODE_OFF" \
+  "$(anchor internal/ui/mullvadpage.go 'id := peer\.StableID\(\)\s*applySwitch\(sw, "set exit node", s, func\(ctx context\.Context, s bool\) error \{\s*return setExitNode\(ctx, id, s\)')")"
+flag AdvertiseKeepsPrior "$(anchor internal/ui/selfpage.go 'connectSwitch\(page\.AdvertiseExitNodeRow, "advertise exit node", func\(ctx context\.Context, s bool\) error \{\s*if s \{\s*err := tsutil\.DisableExitNode\(ctx\)')"
 
 echo "code facts (model constants):"
 for k in "${FLAG_NAMES[@]}"; do
