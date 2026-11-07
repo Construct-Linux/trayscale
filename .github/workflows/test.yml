@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - master
+      - gnome-51
   pull_request:
 
 jobs:
