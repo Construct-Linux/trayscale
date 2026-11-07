@@ -8,6 +8,7 @@ import (
 	"codeberg.org/puregotk/puregotk/v4/adw"
 	"codeberg.org/puregotk/puregotk/v4/gio"
 	"codeberg.org/puregotk/puregotk/v4/gtk"
+	"deedles.dev/trayscale/internal/autostart"
 	"deedles.dev/trayscale/internal/gutil"
 	"deedles.dev/trayscale/internal/locale"
 	"deedles.dev/trayscale/internal/metadata"
@@ -140,6 +141,7 @@ func (a *App) showPreferences() {
 	a.settings.Bind("tray-icon", &dialog.UseTrayIconRow.Object, "active", gio.GSettingsBindDefaultValue)
 	a.settings.Bind("polling-interval", &dialog.PollingIntervalAdjustment.Object, "value", gio.GSettingsBindDefaultValue)
 	a.settings.Bind("taildrop-auto-save", &dialog.TaildropAutoSaveRow.Object, "active", gio.GSettingsBindDefaultValue)
+	bindStartAtLogin(dialog)
 
 	// The row's items are in ExitNodeSelection order.
 	dialog.ExitNodeSelectionRow.SetSelected(uint32(a.exitNodeSelection()))
@@ -213,6 +215,43 @@ func (a *App) showPreferences() {
 
 	dialog.PreferencesDialog.Present(a.parent())
 	dialog.Widget().Unref() // Presented dialogs keep themselves alive.
+}
+
+// bindStartAtLogin shows whether Trayscale starts at login on the
+// dialog's row and asks the portal when the person turns it. It's no
+// setting of Trayscale's: the portal's autostart entry is the state, so
+// the desktop's own settings can turn it off too.
+func bindStartAtLogin(dialog *PreferencesDialog) {
+	row := dialog.StartAtLoginRow
+	row.SetActive(autostart.Enabled(metadata.AppID))
+	// Set while the row is put back to what the portal did, which is
+	// no request of the person's.
+	settling := false
+	gutil.ConnectNotify(row, "active", func() {
+		if settling {
+			return
+		}
+		want := row.GetActive()
+		row.SetSensitive(false)
+		var got bool
+		goTS(&dialog.PreferencesDialog.Object, "set start at login", func(ctx context.Context) (err error) {
+			got, err = autostart.Set(ctx, metadata.AppID, want, locale.Get("Start Trayscale in the tray at login"))
+			return err
+		}, func(err error) {
+			row.SetSensitive(true)
+			if err != nil {
+				got = autostart.Enabled(metadata.AppID)
+				toast := adw.NewToast(locale.Get("Starting at login could not be changed"))
+				toast.SetTimeout(3)
+				dialog.PreferencesDialog.AddToast(toast) // Takes ownership.
+			}
+			if got != row.GetActive() {
+				settling = true
+				row.SetActive(got)
+				settling = false
+			}
+		})
+	})
 }
 
 // showAbout shows the app's about dialog.

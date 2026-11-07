@@ -7,6 +7,7 @@ require (
 	codeberg.org/puregotk/puregotk v0.0.0-20261003054014-d92056b0aa41
 	deedles.dev/tray v0.2.0
 	deedles.dev/xiter v0.2.1
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/klauspost/compress v1.20.3
 	github.com/leonelquinteros/gotext v1.8.0
@@ -120,7 +121,6 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/godbus/dbus/v5 v5.2.4 // indirect
 	github.com/godoc-lint/godoc-lint v0.11.4 // indirect
 	github.com/gofrs/flock v0.13.1 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect

@@ -211,6 +211,9 @@ msgstr "Open Browser to Login"
 msgid "Open a browser to authenticate with Tailscale?"
 msgstr "Open a browser to authenticate with Tailscale?"
 
+msgid "Opens in the tray when you log in"
+msgstr "Opens in the tray when you log in"
+
 msgid "Options"
 msgstr "Options"
 
@@ -267,6 +270,15 @@ msgstr "Show _Offline Peers"
 
 msgid "Some functionality may not work as expected. To resolve, run the following command in a terminal:"
 msgstr "Some functionality may not work as expected. To resolve, run the following command in a terminal:"
+
+msgid "Start at Login"
+msgstr "Start at Login"
+
+msgid "Start Trayscale in the tray at login"
+msgstr "Start Trayscale in the tray at login"
+
+msgid "Starting at login could not be changed"
+msgstr "Starting at login could not be changed"
 
 msgid "Switch account"
 msgstr "Switch account"

@@ -18,6 +18,12 @@
               </object>
             </child>
             <child>
+              <object class="AdwSwitchRow" id="StartAtLoginRow">
+                <property name="subtitle" translatable="yes">Opens in the tray when you log in</property>
+                <property name="title" translatable="yes">Start at Login</property>
+              </object>
+            </child>
+            <child>
               <object class="AdwSpinRow" id="PollingIntervalRow">
                 <property name="adjustment">
                   <object class="GtkAdjustment" id="PollingIntervalAdjustment">

@@ -210,6 +210,9 @@ msgstr "ブラウザを開いてログイン"
 msgid "Open a browser to authenticate with Tailscale?"
 msgstr "ブラウザを開いてTailscaleで認証しますか？"
 
+msgid "Opens in the tray when you log in"
+msgstr "ログイン時にトレイで起動します"
+
 msgid "Options"
 msgstr "オプション"
 
@@ -266,6 +269,15 @@ msgstr "オフラインのピアを表示(_O)"
 
 msgid "Some functionality may not work as expected. To resolve, run the following command in a terminal:"
 msgstr "一部の機能が正常に動作しない可能性があります。解決するには、ターミナルで次のコマンドを実行してください:"
+
+msgid "Start at Login"
+msgstr "ログイン時に起動"
+
+msgid "Start Trayscale in the tray at login"
+msgstr "ログイン時に Trayscale をトレイで起動"
+
+msgid "Starting at login could not be changed"
+msgstr "ログイン時の起動を変更できませんでした"
 
 msgid "Switch account"
 msgstr "アカウントを切り替え"

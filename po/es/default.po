@@ -210,6 +210,9 @@ msgstr "Abrir navegador para iniciar sesión"
 msgid "Open a browser to authenticate with Tailscale?"
 msgstr "¿Abrir un navegador para autenticarse con Tailscale?"
 
+msgid "Opens in the tray when you log in"
+msgstr "Se abre en la bandeja al iniciar sesión"
+
 msgid "Options"
 msgstr "Opciones"
 
@@ -266,6 +269,15 @@ msgstr "Mostrar peers _desconectados"
 
 msgid "Some functionality may not work as expected. To resolve, run the following command in a terminal:"
 msgstr "Algunas funciones pueden no funcionar como se espera. Para solucionarlo, ejecute el siguiente comando en una terminal:"
+
+msgid "Start at Login"
+msgstr "Abrir al iniciar sesión"
+
+msgid "Start Trayscale in the tray at login"
+msgstr "Iniciar Trayscale en la bandeja al iniciar sesión"
+
+msgid "Starting at login could not be changed"
+msgstr "No se pudo cambiar el inicio al iniciar sesión"
 
 msgid "Switch account"
 msgstr "Cambiar de cuenta"
