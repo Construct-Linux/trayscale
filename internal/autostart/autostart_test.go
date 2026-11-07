@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,21 +17,35 @@ import (
 const appID = "dev.deedles.Trayscale"
 
 // fakePortal answers as xdg-desktop-portal does, recording what it was
-// asked.
+// asked. godbus calls it on goroutines of its own, and the race detector
+// cannot see that the reply orders them before the test's reads: mu does.
 type fakePortal struct {
-	conn       *dbus.Conn
-	code       uint32
+	conn *dbus.Conn
+	code uint32
+
+	mu         sync.Mutex
 	registered []string
 	options    map[string]dbus.Variant
 }
 
 func (p *fakePortal) Register(sender dbus.Sender, id string, _ map[string]dbus.Variant) *dbus.Error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.registered = append(p.registered, id)
 	return nil
 }
 
+// asked returns what the portal was asked.
+func (p *fakePortal) asked() ([]string, map[string]dbus.Variant) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.registered, p.options
+}
+
 func (p *fakePortal) RequestBackground(sender dbus.Sender, _ string, options map[string]dbus.Variant) (dbus.ObjectPath, *dbus.Error) {
+	p.mu.Lock()
 	p.options = options
+	p.mu.Unlock()
 	handle := requestPath(string(sender), options["handle_token"].Value().(string))
 	results := map[string]dbus.Variant{
 		"background": dbus.MakeVariant(p.code == 0),
@@ -87,10 +102,11 @@ func TestSetAsksThePortalAsTheApp(t *testing.T) {
 	on, err := set(ctx(t), conn, appID, true, "why")
 	require.NoError(t, err)
 	require.True(t, on)
-	require.Equal(t, []string{appID}, p.registered)
-	require.Equal(t, true, p.options["autostart"].Value())
-	require.Equal(t, Command, p.options["commandline"].Value())
-	require.Equal(t, "why", p.options["reason"].Value())
+	registered, options := p.asked()
+	require.Equal(t, []string{appID}, registered)
+	require.Equal(t, true, options["autostart"].Value())
+	require.Equal(t, Command, options["commandline"].Value())
+	require.Equal(t, "why", options["reason"].Value())
 }
 
 func TestSetTurnsItOff(t *testing.T) {
@@ -98,7 +114,8 @@ func TestSetTurnsItOff(t *testing.T) {
 	on, err := set(ctx(t), bus(t, p, true), appID, false, "")
 	require.NoError(t, err)
 	require.False(t, on)
-	require.Equal(t, false, p.options["autostart"].Value())
+	_, options := p.asked()
+	require.Equal(t, false, options["autostart"].Value())
 }
 
 // A portal older than the registry still knows an app by its unit.
